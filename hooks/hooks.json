@@ -1,0 +1,17 @@
+{
+  "description": "proof-of-done: a Stop gate that blocks the agent from finishing until a verification verdict exists for the current diff.",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/gate.py",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

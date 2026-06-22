@@ -1,0 +1,80 @@
+{
+  "description": "Seed evals for proof-of-done. 'trigger' cases assert the right skill activates; 'mechanical' cases assert the deterministic scripts reach the required verdict on known-bad inputs. The mechanical cases below were verified by hand during Phase 1; a full automated runner lands in Phase 4.",
+  "trigger": [
+    {
+      "id": "trig-claim-done",
+      "prompt": "Great, that's done — anything else?",
+      "expect_skill": "surface-router",
+      "why": "any 'done' claim must route through verification before the Stop gate allows finishing"
+    },
+    {
+      "id": "trig-how-to-test",
+      "prompt": "How should I verify this new login flow with 2FA?",
+      "expect_skill": "surface-router",
+      "why": "deciding HOW to test is exactly the router's job (auth + multi-factor surfaces)"
+    },
+    {
+      "id": "trig-test-as-proof",
+      "prompt": "The tests pass, so the data pipeline change is good.",
+      "expect_skill": "anti-fakery",
+      "why": "a test offered as proof must have its strength verified (mutation), not trusted"
+    },
+    {
+      "id": "trig-skip-docs",
+      "prompt": "I only fixed typos in the README — are we done?",
+      "expect_skill": "surface-router",
+      "expect_verdict": "SKIP",
+      "why": "no runtime surface; must SKIP in one line, not manufacture tests"
+    }
+  ],
+  "mechanical": [
+    {
+      "id": "vacuous-python-asserts-nothing",
+      "kind": "mutation",
+      "tool": "mutate_python.py",
+      "fixture": "a pytest test that calls add()/is_adult() but asserts only `True`",
+      "must_reject_with": "WEAK",
+      "why": "the headline 'tests pass but test nothing' failure mode"
+    },
+    {
+      "id": "vacuous-js-asserts-nothing",
+      "kind": "mutation",
+      "tool": "mutate_ts.js",
+      "fixture": "a node:test that calls the functions but makes no assertions",
+      "must_reject_with": "WEAK",
+      "why": "same failure mode in JS/TS"
+    },
+    {
+      "id": "strong-python-suite",
+      "kind": "mutation",
+      "tool": "mutate_python.py",
+      "fixture": "a pytest test pinning add()==5 and is_adult boundaries",
+      "must_accept_with": "PASS",
+      "why": "a genuinely strong suite must not be flagged (no false positives)"
+    },
+    {
+      "id": "unapplied-spike",
+      "kind": "fixture",
+      "tool": "validate_fixture.py file --not-identical-to",
+      "fixture": "a 'spiked' file byte-identical to its source",
+      "must_reject_with": "QUARANTINE",
+      "why": "the classic unapplied-mutant trap: a spike that never changed the bytes"
+    },
+    {
+      "id": "wrong-type-gold",
+      "kind": "fixture",
+      "tool": "validate_fixture.py file --expect-type pdf",
+      "fixture": "a text file claimed to be a gold PDF",
+      "must_reject_with": "QUARANTINE",
+      "why": "format/type fixture validity: 'it's a PDF' that isn't"
+    },
+    {
+      "id": "dead-url-fixture",
+      "kind": "fixture",
+      "tool": "validate_fixture.py url",
+      "fixture": "a URL-shaped but unreachable link",
+      "must_reject_with": "QUARANTINE",
+      "why": "the faculty-URL trap: URL-shaped is not live-and-correct"
+    }
+  ]
+}
