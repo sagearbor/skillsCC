@@ -78,3 +78,20 @@ def test_skip_verdict_allows(tmp_path):
     (repo / "app.py").write_text("v1\nx = 1\n")
     _record(repo, "SKIP")
     assert _decision(repo) == "allow"
+
+
+def test_multi_file_change_recommends_prove(tmp_path):
+    repo = _repo(tmp_path)
+    for i in range(3):
+        (repo / f"f{i}.py").write_text(f"x = {i}\n")
+    out = _gate(repo)
+    assert out.get("decision") == "block"
+    assert "/prove" in out.get("reason", ""), "multi-file change should escalate to /prove"
+
+
+def test_single_file_change_no_prove_escalation(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / "app.py").write_text("v1\nx = 1\n")
+    out = _gate(repo)
+    assert out.get("decision") == "block"
+    assert "/prove" not in out.get("reason", ""), "single-file change should not escalate"
