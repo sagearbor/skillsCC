@@ -19,9 +19,26 @@ Exit code: 0 PASS, 1 WEAK, 2 INCONCLUSIVE (also on usage error).
 import argparse
 import ast
 import json
+import os
 import shlex
+import signal
 import subprocess
 import sys
+
+
+def _restore(originals, backups=()):
+    """Rewrite every source from its in-memory original and drop backup files."""
+    for path, src in originals.items():
+        try:
+            with open(path, "w") as fh:
+                fh.write(src)
+        except OSError:
+            pass
+    for bak in backups:
+        try:
+            os.remove(bak)
+        except OSError:
+            pass
 
 
 class _Collector(ast.NodeVisitor):
@@ -154,6 +171,22 @@ def main():
         step = len(plan) / args.max_mutants
         plan = [plan[int(i * step)] for i in range(args.max_mutants)]
 
+    # Write on-disk backups (the only protection against an uncatchable SIGKILL) and install
+    # handlers so a timeout/Ctrl-C restores sources instead of leaving a mutant on disk.
+    backups = []
+    for path, src in originals.items():
+        bak = path + ".pod-bak"
+        with open(bak, "w") as fh:
+            fh.write(src)
+        backups.append(bak)
+
+    def _on_signal(signum, frame):
+        _restore(originals, backups)
+        sys.exit(2)
+
+    signal.signal(signal.SIGTERM, _on_signal)
+    signal.signal(signal.SIGINT, _on_signal)
+
     survivors, killed, errored = [], 0, 0
     try:
         for path, idx in plan:
@@ -179,9 +212,7 @@ def main():
             else:
                 killed += 1
     finally:
-        for path, src in originals.items():  # belt-and-suspenders restore
-            with open(path, "w") as fh:
-                fh.write(src)
+        _restore(originals, backups)  # belt-and-suspenders restore + backup cleanup
 
     evaluated = killed + len(survivors)
     survival_rate = (len(survivors) / evaluated) if evaluated else 1.0

@@ -29,8 +29,9 @@ def main():
           f"{len(cases.get('trigger', []))} trigger cases (trigger cases are doc-only).")
 
     results = {
-        "pytest (anti-fakery + gate)": run(
-            "pytest", [PY, "-m", "pytest", "-q", "tests/test_anti_fakery.py", "tests/test_gate.py"]),
+        "pytest (anti-fakery + gate + data)": run(
+            "pytest", [PY, "-m", "pytest", "-q", "tests/test_anti_fakery.py",
+                       "tests/test_gate.py", "tests/test_data_invariants.py"]),
         "node:test (mutate_ts)": run(
             "node --test", ["node", "--test", "tests/test_mutate_ts.mjs"]),
     }
