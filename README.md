@@ -127,13 +127,22 @@ proof-of-done/                         (this repo IS the plugin)
 │   │       ├── mutate_python.py       AST mutation: prove a pytest suite can fail
 │   │       ├── mutate_ts.js           text mutation: prove a JS/TS suite can fail
 │   │       └── validate_fixture.py    quarantine invalid fixtures / oracles
-│   └── evidence/SKILL.md              per-surface evidence bar + SKIP/BLOCKED rules
+│   ├── evidence/SKILL.md              per-surface evidence bar + SKIP/BLOCKED rules
+│   ├── verifier-data/                 data invariants (data_invariants.py)
+│   ├── verifier-latency/              p50/p95/p99 vs budget (latency_probe.py)
+│   ├── verifier-semantic/            content validity, not format (semantic_check.py)
+│   ├── verifier-browser/SKILL.md      drive the real UI via Playwright MCP
+│   └── verifier-auth/SKILL.md         positive + negative identity/access checks
 ├── agents/refute-done.md              independent verifier, prompted to refute "done"
+├── commands/
+│   ├── prove.md                       /prove — milestone verification across the diff
+│   └── capture-gap.md                 /capture-gap — escape → enforced regression + Gotcha
 ├── hooks/
 │   ├── hooks.json                     registers the Stop gate
 │   └── scripts/{gate.py, record_verdict.py}
-├── evals/cases.json                   trigger + must-catch eval seeds
-├── regressions/                       one fixture per historical escape (Phase 4)
+├── tests/                             self-tests for every script + the gate
+├── evals/{cases.json, run.py}         must-catch cases + single-command runner
+├── regressions/                       one fixture per historical escape (the moat)
 ├── verification-surface-atlas.md      the full reasoning behind the routing table
 └── verification-surfaces.mermaid      the atlas mindmap source
 ```
@@ -200,10 +209,12 @@ python3 skills/anti-fakery/scripts/validate_fixture.py file gold.pdf --expect-ty
 
 | Phase | Scope | State |
 |---|---|---|
-| **1** | Gate · surface-router · anti-fakery scripts · `refute-done` · evidence rules · evals seed | **Done & tested** — all three scripts verified end-to-end; gate verified across 6 states; `plugin-validator` clean |
-| 2 | Real surface verifiers: browser (Playwright MCP), semantic/LLM-doc, data invariants, auth ±, latency | Planned |
-| 3 | `/prove` over an integrated milestone + auto-escalation from the gate | Planned |
-| 4 | `/capture-gap` + `regressions/` moat + full eval runner red-teaming the verifier itself | Planned |
+| **1** | Gate · surface-router · anti-fakery scripts · `refute-done` · evidence rules · evals seed | **Done & tested** — gate verified across 8 states; `plugin-validator` clean |
+| **2** | `verifier-data`, `verifier-latency`, `verifier-semantic` (with self-tests); `verifier-browser` + `verifier-auth` (guidance) | **Mostly done** — the three script-backed verifiers are tested; browser/auth are written but need a running app + Playwright MCP to live-verify (they report BLOCKED until then) |
+| **3** | `/prove` over an integrated milestone + gate escalation to `/prove` on multi-file changes | **Done** |
+| **4** | `/capture-gap` + `tests/`/`evals/run.py` runner; `regressions/` moat | **Done** — runner enforces every must-catch case; `regressions/` fills on the first real escape |
+
+Run the whole verification suite with `python3 evals/run.py` (exits non-zero on any failure).
 
 ---
 
