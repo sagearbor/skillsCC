@@ -169,6 +169,17 @@ function main() {
     plan = Array.from({ length: opts.maxMutants }, (_, i) => plan[Math.floor(i * step)]);
   }
 
+  // On-disk backups (only protection against an uncatchable SIGKILL) + signal handlers so a
+  // timeout/Ctrl-C restores sources instead of leaving a mutant on disk.
+  const backups = opts.files.map((f) => f + ".pod-bak");
+  opts.files.forEach((f, i) => fs.writeFileSync(backups[i], originals[f]));
+  const restore = () => {
+    for (const f of opts.files) { try { fs.writeFileSync(f, originals[f]); } catch (e) { /* */ } }
+    for (const b of backups) { try { fs.unlinkSync(b); } catch (e) { /* */ } }
+  };
+  process.on("SIGTERM", () => { restore(); process.exit(2); });
+  process.on("SIGINT", () => { restore(); process.exit(2); });
+
   const survivors = [];
   let killed = 0, errored = 0;
   try {
@@ -181,7 +192,7 @@ function main() {
       else killed++;
     }
   } finally {
-    for (const f of opts.files) fs.writeFileSync(f, originals[f]); // belt-and-suspenders
+    restore(); // belt-and-suspenders restore + backup cleanup
   }
 
   const evaluated = killed + survivors.length;

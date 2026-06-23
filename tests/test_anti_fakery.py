@@ -5,8 +5,11 @@ verdict on a known-good or known-bad input. These are the mechanical eval cases 
 evals/cases.json, made executable.
 """
 import json
+import signal
 import subprocess
 import sys
+import textwrap
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,3 +85,24 @@ def test_validate_fixture_quarantines_dead_url(tmp_path):
     proc = _run([str(SCRIPTS / "validate_fixture.py"), "url",
                  "http://no-such-host.invalid/x", "--timeout", "5"], tmp_path)
     assert _verdict(proc) == "QUARANTINE", proc.stdout
+
+
+def test_mutate_python_restores_source_when_killed(tmp_path):
+    """A SIGTERM mid-mutation must not leave the source corrupted (regression: a timeout
+    once left a mutant on disk because restore was only in `finally`)."""
+    (tmp_path / "calc.py").write_text(CALC)
+    # test-cmd passes fast on the baseline run, then hangs on every mutant run.
+    (tmp_path / "runner.py").write_text(textwrap.dedent("""
+        import os, sys, time
+        if not os.path.exists(".ran"):
+            open(".ran", "w").close(); sys.exit(0)   # baseline: green, fast
+        time.sleep(60)                               # mutant runs: hang until killed
+    """))
+    proc = subprocess.Popen(
+        [PY, str(SCRIPTS / "mutate_python.py"), "--test-cmd", f"{PY} runner.py", "calc.py"],
+        cwd=tmp_path)
+    time.sleep(5)  # let baseline pass, backup write, first mutation apply, enter the hang
+    proc.send_signal(signal.SIGTERM)
+    proc.wait(timeout=15)
+    assert (tmp_path / "calc.py").read_text() == CALC, "source not restored after SIGTERM"
+    assert not (tmp_path / "calc.py.pod-bak").exists(), "backup file left behind"
