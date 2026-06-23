@@ -114,12 +114,23 @@ function applyMutation(src, c) {
   return lines.join("\n");
 }
 
+function cleanEnv() {
+  // Strip vars that make a nested `node --test` report to a parent runner and exit 0 even
+  // on failure (NODE_TEST_CONTEXT), or inject flags (NODE_OPTIONS). Without this, running
+  // this checker from inside a test runner / CI yields false PASS — the very failure it hunts.
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.NODE_OPTIONS;
+  return env;
+}
+
 function runTests(cmd, timeoutSec) {
   // Split on whitespace; no shell, so metacharacters aren't interpreted.
   const parts = cmd.match(/\S+/g) || [];
   const res = spawnSync(parts[0], parts.slice(1), {
     timeout: timeoutSec * 1000,
     encoding: "utf8",
+    env: cleanEnv(),
   });
   if (res.error && res.error.code === "ETIMEDOUT") return { green: false, err: "timeout" };
   if (res.error) return { green: false, err: String(res.error.message) };
