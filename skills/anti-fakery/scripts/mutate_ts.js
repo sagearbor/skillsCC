@@ -34,20 +34,43 @@ function parseArgs(argv) {
 }
 
 // Each rule: a global regex over a single line, and a function producing the replacement.
+// Lookarounds keep multi-char operators (===, !==, **, ++, +=, =>) from being half-matched.
 const RULES = [
   { name: "eqeqeq", re: /===/g, repl: () => "!==" },
   { name: "noteqeq", re: /!==/g, repl: () => "===" },
+  { name: "eqeq", re: /(?<![=!<>])==(?!=)/g, repl: () => "!=" },
+  { name: "noteq", re: /(?<![=!<>])!=(?!=)/g, repl: () => "==" },
   { name: "gte", re: /(?<![<>=!])>=(?!=)/g, repl: () => "<" },
   { name: "lte", re: /(?<![<>=!])<=(?!=)/g, repl: () => ">" },
+  { name: "and", re: /&&/g, repl: () => "||" },
+  { name: "or", re: /\|\|/g, repl: () => "&&" },
   { name: "bool-true", re: /\btrue\b/g, repl: () => "false" },
   { name: "bool-false", re: /\bfalse\b/g, repl: () => "true" },
+  // Arithmetic, spaced and unspaced. Unspaced forms require an operand on each side so
+  // they never match ++, --, +=, **, =>, // or /* .
   { name: "plus", re: / \+ /g, repl: () => " - " },
+  { name: "minus", re: / - /g, repl: () => " + " },
+  { name: "plus-tight", re: /(?<=[\w)\]])\+(?=[\w(])/g, repl: () => "-" },
+  { name: "minus-tight", re: /(?<=[\w)\]])-(?=[\w(])/g, repl: () => "+" },
+  { name: "times-tight", re: /(?<=[\w)\]])\*(?=[\w(])/g, repl: () => "+" },
   { name: "int", re: /\b\d+\b/g, repl: (m) => String(parseInt(m, 10) + 1) },
 ];
 
 function isCommentLine(line) {
   const t = line.trim();
   return t.startsWith("//") || t.startsWith("*") || t.startsWith("/*");
+}
+
+/** Rough guard: is column `col` inside a string/template literal on this line? Counts
+ *  unescaped quotes before col; an odd count means we're inside one. Avoids mutating
+ *  operators that live in string content. */
+function inString(line, col) {
+  let q = 0;
+  for (let i = 0; i < col; i++) {
+    const c = line[i];
+    if ((c === '"' || c === "'" || c === "`") && line[i - 1] !== "\\") q++;
+  }
+  return q % 2 === 1;
 }
 
 /** Return candidate mutations [{line, col, len, replacement, op}] for a source string. */
@@ -60,6 +83,7 @@ function candidates(src) {
       rule.re.lastIndex = 0;
       let m;
       while ((m = rule.re.exec(line)) !== null) {
+        if (inString(line, m.index)) continue;
         out.push({
           line: li,
           col: m.index,
