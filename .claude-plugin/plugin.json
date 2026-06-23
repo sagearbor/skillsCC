@@ -1,0 +1,10 @@
+{
+  "name": "proof-of-done",
+  "version": "0.1.0",
+  "description": "Stops agents from claiming a task is done until it proves it: routes the change to the right verification surface, reaches that surface with an independent adversarial verifier, and mechanically rejects vacuous tests and invalid oracles.",
+  "author": {
+    "name": "Sophie Arborbot",
+    "email": "sophie.arborbot@gmail.com"
+  },
+  "license": "MIT"
+}
