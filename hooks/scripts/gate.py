@@ -49,6 +49,14 @@ def work_signature(project):
     return digest, True, True
 
 
+def changed_files(project):
+    code, status, _ = _git(project, "status", "--porcelain=v1",
+                           "--", ".", ":(exclude).proof-of-done/")
+    if code != 0:
+        return []
+    return [ln for ln in status.decode("utf-8", "replace").splitlines() if ln.strip()]
+
+
 def _emit(decision, reason=None):
     out = {}
     if decision == "block":
@@ -87,19 +95,26 @@ def main():
     if not has_changes:
         _emit("allow")  # clean tree — nothing changed to verify
 
+    # A multi-file change is a milestone: recommend the deeper /prove pass over per-file checks.
+    nfiles = len(changed_files(project))
+    base = BLOCK_REASON
+    if nfiles >= 3:
+        base += (f"\n\nThis change spans {nfiles} files — run /prove to verify the integrated "
+                 "milestone across every exposed surface, not just the last edit.")
+
     verdict_path = os.path.join(project, ".proof-of-done", "verdict.json")
     try:
         with open(verdict_path) as fh:
             record = json.load(fh)
     except (OSError, json.JSONDecodeError, ValueError):
-        _emit("block", BLOCK_REASON)
+        _emit("block", base)
 
     verdict = record.get("verdict")
     recorded_sig = record.get("work_signature")
     if verdict not in VALID_VERDICTS:
-        _emit("block", BLOCK_REASON + f"\n(found verdict={verdict!r}, which is not valid)")
+        _emit("block", base + f"\n(found verdict={verdict!r}, which is not valid)")
     if sig is not None and recorded_sig != sig:
-        _emit("block", BLOCK_REASON +
+        _emit("block", base +
               "\n(a verdict exists but it was recorded for a different diff — the code changed "
               "since it was verified, so re-verify the current work)")
     _emit("allow", f"proof-of-done: {verdict} verdict on file for the current diff.")
